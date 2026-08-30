@@ -585,9 +585,9 @@ int main(void)
 	int OriginalPaletteID;	// Original palette
 
 	// Generate another palette for our original image palette
-	//glGenTextures(1, &OriginalPaletteID);
+	glGenTextures(1, &OriginalPaletteID);
 	ResetPalette();
-	glBindTexture(0, palette);//OriginalPaletteID);
+	glBindTexture(0, OriginalPaletteID);//OriginalPaletteID);
 	glColorTableEXT(0,0,256,0,0,palette);
 
 	//-----------------------------------------------------------------

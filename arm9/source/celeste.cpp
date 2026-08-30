@@ -15,7 +15,7 @@
 #include "celeste.h"
 #include "math_util.h"
 
-//#define CELESTE_P8_FIXEDP
+#define CELESTE_P8_FIXEDP
 
 #ifdef CELESTE_P8_FIXEDP
 

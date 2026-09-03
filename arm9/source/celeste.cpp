@@ -11,7 +11,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdio.h>
-
+#include <unistd.h>
+#include <errno.h>
 #include "celeste.h"
 #include "math_util.h"
 
@@ -2030,13 +2031,40 @@ void Celeste_P8_save_state(void* st_) {
 #define V_SAVE(v) memcpy(st, &v, sizeof v), st += sizeof v;
 	LISTGVARS(V_SAVE)
 #undef V_SAVE
+    size_t size=Celeste_P8_get_state_size();
+    FILE * f=fopen("fat:/celeste.sav", "wb");
+    if (f){
+        if (size==fwrite(st_, 1, size,f)){
+            printf("saved expected size\n");
+        } else{
+            printf("size unexpected\n");
+        }
+        fclose(f);
+    } else{
+        printf("saving failed! errno: %d\n", errno);
+    }
 }
-void Celeste_P8_load_state(const void* st_) {
+void Celeste_P8_load_state(void* st_) {
 	assert(st_ != NULL);
+    size_t size=Celeste_P8_get_state_size();
+    FILE * f=fopen("fat:/celeste.sav", "rb");
+    if (f){
+        if (size==fread(st_, 1, size,f)){
+            printf("loaded expected size\n");
+        } else{
+            printf("size unexpected\n");
+        }
+
+        fclose(f);
+    } else {
+        printf("loading failed! errno: %d\n", errno);
+        return;
+    }
 	const char* st = (const char*)st_;
 #define V_LOAD(v) memcpy(&v, st, sizeof v), st += sizeof v;
 	LISTGVARS(V_LOAD)
 #undef V_LOAD
+
 }
 
 #undef LISTGVARS

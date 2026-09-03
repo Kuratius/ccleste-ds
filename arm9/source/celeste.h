@@ -27,7 +27,7 @@ extern void Celeste_P8__DEBUG(void); //debug functionality
 //state functionality
 size_t Celeste_P8_get_state_size(void);
 void Celeste_P8_save_state(void* st);
-void Celeste_P8_load_state(const void* st);
+void Celeste_P8_load_state(void* st);
 
 #ifdef __cplusplus
 } //extern "C"

@@ -18,6 +18,7 @@
 #include "gl2dfix.h"
 #include <maxmod9.h>
 #include <filesystem.h>
+#include <fat.h>
 
 //Resources
 #include "strm.h"
@@ -448,6 +449,8 @@ static void mainLoop(void) {
 		
 	static int reset_input_timer = 0;
 	//select+start+y to reset
+	game_state = game_state ? game_state : malloc(Celeste_P8_get_state_size());
+
 	if (initial_game_state != NULL && (keys & (KEY_START + KEY_SELECT + KEY_Y)))
 	{
 		reset_input_timer++;
@@ -467,7 +470,6 @@ static void mainLoop(void) {
 
 	if(keys_down & KEY_R)
 	{
-		game_state = game_state ? game_state : malloc(Celeste_P8_get_state_size());
 		if (game_state) {
 			OSDset("save state");
 			Celeste_P8_save_state(game_state);
@@ -481,7 +483,7 @@ static void mainLoop(void) {
 		if (game_state) {
 		OSDset("load state");
 		//if (paused) paused = 0, Mix_Resume(-1), Mix_ResumeMusic();
-		Celeste_P8_load_state(game_state);
+		    Celeste_P8_load_state(game_state);
 		/*TODO
 		if (current_music != game_state_music) {
 			Mix_HaltMusic();
@@ -562,8 +564,15 @@ static void mainLoop(void) {
 //---------------------------------------------------------------------
 // main
 //---------------------------------------------------------------------
-int main(void) 
+int main(int argc, char ** argv)
 {	
+    consoleDebugInit(DebugDevice_NOCASH);
+    if (argv){
+        fprintf(stderr,"argv[0]: %s\n", argv[0]);
+    } else {
+        fprintf(stderr,"no argv :( \n");
+    }
+
 	//-----------------------------------------------------------------
 	// Initialize the graphics engines
 	//-----------------------------------------------------------------
@@ -599,7 +608,6 @@ int main(void)
 	videoSetModeSub(MODE_0_2D);	
 
 	PrintConsole *console = consoleInit(0,0, BgType_Text4bpp, BgSize_T_256x256, map_base, tile_base, false, true);
-
 	/*ConsoleFont font;
 
 	font.gfx = (u16*)fontBitmap;
@@ -615,6 +623,10 @@ int main(void)
 	defaultExceptionHandler();
 	if (!nitroFSInit(NULL)) {
 		printf("NitroFSInit failure\n");
+	}
+	bool fatInit =fatInitDefault();
+	if (!fatInit) {
+		printf("FatFSInit failure\n");
 	}
 
 	soundEnable();
@@ -661,7 +673,7 @@ int main(void)
 
 	//for reset
 	initial_game_state = malloc(Celeste_P8_get_state_size());
-	if (initial_game_state) Celeste_P8_save_state(initial_game_state);
+	//if (initial_game_state) Celeste_P8_save_state(initial_game_state);
 
 	//TODO: ADD RANDOM TIMER
 	Celeste_P8_set_rndseed(8);//(unsigned)(time(NULL) + timer));

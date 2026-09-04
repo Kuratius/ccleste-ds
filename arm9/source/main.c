@@ -449,7 +449,7 @@ static void mainLoop(void) {
 		
 	static int reset_input_timer = 0;
 	//select+start+y to reset
-	game_state = game_state ? game_state : malloc(Celeste_P8_get_state_size());
+
 
 	if (initial_game_state != NULL && (keys & (KEY_START + KEY_SELECT + KEY_Y)))
 	{
@@ -470,8 +470,10 @@ static void mainLoop(void) {
 
 	if(keys_down & KEY_R)
 	{
+		game_state = game_state ? game_state : malloc(Celeste_P8_get_state_size());
 		if (game_state) {
 			OSDset("save state");
+
 			Celeste_P8_save_state(game_state);
 			//TODO 
 			//game_state_music = current_music;
@@ -490,7 +492,10 @@ static void mainLoop(void) {
 			current_music = game_state_music;
 			if (game_state_music) Mix_PlayMusic(game_state_music, -1);
 		}*/
-		}
+		} else {
+			game_state = game_state ? game_state : malloc(Celeste_P8_get_state_size());
+			Celeste_P8_save_state(game_state);
+        }
 	}
 	if(keys_down & KEY_START)
 	{

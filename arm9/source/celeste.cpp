@@ -2057,8 +2057,8 @@ void Celeste_P8_load_state(void* st_) {
 
         fclose(f);
     } else {
-        printf("loading failed! errno: %d\n", errno);
-        return;
+        printf("couldn't open save! errno: %d\n", errno);
+
     }
 	const char* st = (const char*)st_;
 #define V_LOAD(v) memcpy(&v, st, sizeof v), st += sizeof v;

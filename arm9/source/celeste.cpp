@@ -15,7 +15,8 @@
 #include <errno.h>
 #include "celeste.h"
 #include "math_util.h"
-
+extern "C" void begin_stream(const char * filename);
+extern "C" void end_stream();
 #define CELESTE_P8_FIXEDP
 
 #ifdef CELESTE_P8_FIXEDP
@@ -386,7 +387,8 @@ static void title_screen() {
 	max_djump=1;
 	start_game=false;
 	start_game_flash=0;
-	P8music(40,0,7);
+    begin_stream("nitro:/music/mus4fx.wav");
+	//P8music(40,0,7);
    
 	load_room(7,3);
 }
@@ -397,7 +399,9 @@ static void begin_game() {
 	minutes=0;
 	music_timer=0;
 	start_game=false;
-	P8music(0,0,7);
+	//P8music(0,0,7);
+    end_stream();
+    begin_stream("nitro:/music/mus0fx.wav");
 	load_room(0,0);
 }
 
@@ -1625,12 +1629,20 @@ static void restart_room() {
 static void next_room() {
 	if (room.x==2 && room.y==1) {
 		P8music(30,500,7);
+        end_stream();
+        begin_stream("nitro:/music/mus3fx.wav");
 	} else if (room.x==3 && room.y==1) {
 		P8music(20,500,7);
+        end_stream();
+        begin_stream("nitro:/music/mus2fx.wav");
 	} else if (room.x==4 && room.y==2) {
 		P8music(30,500,7);
+        end_stream();
+        begin_stream("nitro:/music/mus3fx.wav");
 	} else if (room.x==5 && room.y==3) {
 		P8music(30,500,7);
+        end_stream();
+        begin_stream("nitro:/music/mus3fx.wav");
 	}
 
 	if (room.x==7) {
@@ -1639,6 +1651,9 @@ static void next_room() {
 		load_room(room.x+1,room.y);
 	}
 }
+
+
+
 
 static bool room_just_loaded = false; //for debugging loading jank
 static void load_room(int x, int y) {

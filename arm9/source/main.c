@@ -122,11 +122,11 @@ static void LoadData(void) {
 	for (int id = 0; id < sizeof sndnum; id++) {
 		char fname[20];
 		sprintf(fname, "snd%i.wav", sndnum[id]);
-		LOGLOAD(fname);
+		//LOGLOAD(fname);
 		mm_sound_effect temp = {{sndids[id]},(int)(1.0f * (1<<10)),0,255,255};
 		snd[sndnum[id]] = temp;
 		mmLoadEffect(sndids[id]);
-		LOGDONE();
+		//LOGDONE();
 	}
 	/*static const char musnum[] = {0,10,30,40};
 	static const char musids[] = {SFX_MUS0,SFX_MUS10,SFX_MUS30,SFX_MUS40};
@@ -153,6 +153,195 @@ static void ResetPalette(void) {
 static int gettileflag(int tile, int flag) {
 	return tile < sizeof(tile_flags)/sizeof(*tile_flags) && (tile_flags[tile] & (1 << flag)) != 0;
 }
+
+void waitForever(void)
+{
+    while (1)
+        swiWaitForVBlank();
+}
+
+
+#define DATA_ID 0x61746164
+#define FMT_ID  0x20746d66
+#define RIFF_ID 0x46464952
+#define WAVE_ID 0x45564157
+
+typedef struct WAVHeader
+{
+    // "RIFF" chunk descriptor
+    uint32_t chunkID;
+    uint32_t chunkSize;
+    uint32_t format;
+    // "fmt" subchunk
+    uint32_t subchunk1ID;
+    uint32_t subchunk1Size;
+    uint16_t audioFormat;
+    uint16_t numChannels;
+    uint32_t sampleRate;
+    uint32_t byteRate;
+    uint16_t blockAlign;
+    uint16_t bitsPerSample;
+    // "data" subchunk
+    uint32_t subchunk2ID;
+    uint32_t subchunk2Size;
+}
+WAVHeader_t;
+
+#define BUFFER_LENGTH 16384
+
+FILE *wavFile = NULL;
+
+char stream_buffer[BUFFER_LENGTH];
+int stream_buffer_in;
+int stream_buffer_out;
+
+mm_word streamingCallback(mm_word length,
+                          mm_addr dest,
+                          mm_stream_formats format)
+{
+    size_t multiplier = 0;
+
+    if (format == MM_STREAM_8BIT_MONO)
+        multiplier = 1;
+    else if (format == MM_STREAM_8BIT_STEREO)
+        multiplier = 2;
+    else if (format == MM_STREAM_16BIT_MONO)
+        multiplier = 2;
+    else if (format == MM_STREAM_16BIT_STEREO)
+        multiplier = 4;
+
+    size_t size = length * multiplier;
+
+    size_t bytes_until_end = BUFFER_LENGTH - stream_buffer_out;
+
+    if (bytes_until_end > size)
+    {
+        char *src_ = &stream_buffer[stream_buffer_out];
+
+        memcpy(dest, src_, size);
+        stream_buffer_out += size;
+    }
+    else
+    {
+        char *src_ = &stream_buffer[stream_buffer_out];
+        char *dst_ = dest;
+
+        memcpy(dst_, src_, bytes_until_end);
+        dst_ += bytes_until_end;
+        size -= bytes_until_end;
+
+        src_ = &stream_buffer[0];
+        memcpy(dst_, src_, size);
+        stream_buffer_out = size;
+    }
+
+    return length;
+}
+
+
+
+void readFile(char *buffer, size_t size)
+{
+    while (size > 0)
+    {
+        int res = fread(buffer, 1, size, wavFile);
+        size -= res;
+        buffer += res;
+
+        if (feof(wavFile))
+        {
+            // Loop back when song ends
+            fseek(wavFile, sizeof(WAVHeader_t), SEEK_SET);
+            res = fread(buffer, 1, size, wavFile);
+            size -= res;
+            buffer += res;
+
+            printf("Restarting...\n");
+        }
+    }
+}
+
+
+
+void streamingFillBuffer(bool force_fill)
+{
+    if (!force_fill)
+    {
+        if (stream_buffer_in == stream_buffer_out)
+            return;
+    }
+
+    if (stream_buffer_in < stream_buffer_out)
+    {
+        size_t size = stream_buffer_out - stream_buffer_in;
+        readFile(&stream_buffer[stream_buffer_in], size);
+        stream_buffer_in += size;
+    }
+    else
+    {
+        size_t size = BUFFER_LENGTH - stream_buffer_in;
+        readFile(&stream_buffer[stream_buffer_in], size);
+        stream_buffer_in = 0;
+
+        size = stream_buffer_out - stream_buffer_in;
+        readFile(&stream_buffer[stream_buffer_in], size);
+        stream_buffer_in += size;
+    }
+
+    if (stream_buffer_in >= BUFFER_LENGTH)
+        stream_buffer_in -= BUFFER_LENGTH;
+}
+
+
+int checkWAVHeader(const WAVHeader_t header)
+{
+    if (header.chunkID != RIFF_ID)
+    {
+        printf("Wrong RIFF_ID %lx\n", header.chunkID);
+        return 1;
+    }
+
+    if (header.format != WAVE_ID)
+    {
+        printf("Wrong WAVE_ID %lx\n", header.format);
+        return 1;
+    }
+
+    if (header.subchunk1ID != FMT_ID)
+    {
+        printf("Wrong FMT_ID %lx\n", header.subchunk1ID);
+        return 1;
+    }
+
+    if (header.subchunk2ID != DATA_ID)
+    {
+        printf("Wrong Subchunk2ID %lx\n", header.subchunk2ID);
+        return 1;
+    }
+
+    return 0;
+}
+
+mm_stream_formats getMMStreamType(uint16_t numChannels, uint16_t bitsPerSample)
+{
+    if (numChannels == 1)
+    {
+        if (bitsPerSample == 8)
+            return MM_STREAM_8BIT_MONO;
+        else
+            return MM_STREAM_16BIT_MONO;
+    }
+    else if (numChannels == 2)
+    {
+        if (bitsPerSample == 8)
+            return MM_STREAM_8BIT_STEREO;
+        else
+            return MM_STREAM_16BIT_STEREO;
+    }
+    return MM_STREAM_8BIT_MONO;
+}
+
+
 
 static void p8_line(int x0, int y0, int x1, int y1, unsigned char color) {
 	#define CLAMP(v,min,max) v = v < min ? min : v >= max ? max-1 : v;
@@ -467,10 +656,9 @@ static void mainLoop(void) {
 		}
 	} else reset_input_timer = 0;
 
-
+	game_state = game_state ? game_state : malloc(Celeste_P8_get_state_size());
 	if(keys_down & KEY_R)
 	{
-		game_state = game_state ? game_state : malloc(Celeste_P8_get_state_size());
 		if (game_state) {
 			OSDset("save state");
 
@@ -482,20 +670,19 @@ static void mainLoop(void) {
 
 	if(keys_down & KEY_L)
 	{
+
 		if (game_state) {
 		OSDset("load state");
 		//if (paused) paused = 0, Mix_Resume(-1), Mix_ResumeMusic();
 		    Celeste_P8_load_state(game_state);
+		    Celeste_P8_save_state(game_state);
 		/*TODO
 		if (current_music != game_state_music) {
 			Mix_HaltMusic();
 			current_music = game_state_music;
 			if (game_state_music) Mix_PlayMusic(game_state_music, -1);
 		}*/
-		} else {
-			game_state = game_state ? game_state : malloc(Celeste_P8_get_state_size());
-			Celeste_P8_save_state(game_state);
-        }
+		} 
 	}
 	if(keys_down & KEY_START)
 	{
@@ -566,6 +753,56 @@ static void mainLoop(void) {
 	swiWaitForVBlank();
 }
 
+
+void begin_stream(const char * filename){
+
+
+    wavFile = fopen(filename, "rb");
+    if (wavFile == NULL)
+    {
+        perror("fopen");
+        waitForever();
+    }
+
+    WAVHeader_t wavHeader = { 0 };
+    if (fread(&wavHeader, 1, sizeof(WAVHeader_t), wavFile) != sizeof(WAVHeader_t))
+    {
+        perror("fread");
+        waitForever();
+    }
+    if (checkWAVHeader(wavHeader) != 0)
+    {
+        printf("WAV file header is corrupt!\n");
+        waitForever();
+    }
+
+    // Fill the buffer before we start doing anything
+    streamingFillBuffer(true);
+
+    // We are not using a soundbank so we need to manually initialize
+    // mm_ds_system.
+
+
+    // Open the stream
+    static mm_stream stream;
+    stream.sampling_rate=wavHeader.sampleRate;
+    stream.buffer_length=2048;
+    stream.callback      = streamingCallback;
+    stream.format        = getMMStreamType(wavHeader.numChannels, wavHeader.bitsPerSample);
+    stream.timer         = MM_TIMER0;
+    stream.manual        = false;
+
+    mmStreamOpen(&stream);
+
+
+}
+
+void end_stream(){
+    mmStreamClose();
+
+}
+
+
 //---------------------------------------------------------------------
 // main
 //---------------------------------------------------------------------
@@ -603,7 +840,6 @@ int main(int argc, char ** argv)
 	ResetPalette();
 	glBindTexture(0, OriginalPaletteID);//OriginalPaletteID);
 	glColorTableEXT(0,0,256,0,0,palette);
-
 	//-----------------------------------------------------------------
 	// Initialize the console on bottom screen
 	//-----------------------------------------------------------------
@@ -612,7 +848,21 @@ int main(int argc, char ** argv)
 	
 	videoSetModeSub(MODE_0_2D);	
 
+
 	PrintConsole *console = consoleInit(0,0, BgType_Text4bpp, BgSize_T_256x256, map_base, tile_base, false, true);
+	bool fatInit =fatInitDefault();
+	if (!fatInit)
+    {
+		printf("FatFSInit failure\n");
+	}
+
+    bool nitroInit=nitroFSInit(NULL);
+	if (!nitroInit)
+    {
+		printf("NitroFSInit failure\n");
+	}
+
+
 	/*ConsoleFont font;
 
 	font.gfx = (u16*)fontBitmap;
@@ -625,22 +875,22 @@ int main(int argc, char ** argv)
 	
 	consoleSetFont(console, &font);*/
 
+
+
 	defaultExceptionHandler();
-	if (!nitroFSInit(NULL)) {
-		printf("NitroFSInit failure\n");
-	}
-	bool fatInit =fatInitDefault();
-	if (!fatInit) {
-		printf("FatFSInit failure\n");
-	}
+
 
 	soundEnable();
-
+#if 0
 	SoundStrm_t *strm = playSoundStrm("nitro:/music/mus0.wav", 1);
 	if(strm == 0) {
 		printf("failed to start wave stream :(\n");
 	}
+#else
 
+    //begin_stream("nitro:/music/mus0fx.wav");
+
+#endif
 	/////////////////////////////////////////////////////////////////////////
 	ResetPalette();
 	printf("game state size %gkb\n", Celeste_P8_get_state_size()/1024.);
@@ -694,11 +944,12 @@ int main(int argc, char ** argv)
 	while(running) 
 	{
 		mainLoop();
+        streamingFillBuffer(false);
 		oamUpdate(&oamSub);
 	}
-
-	if (game_state) free(game_state);
-	if (initial_game_state) free(initial_game_state);
+    end_stream();
+	free(game_state);
+	free(initial_game_state);
 
 	return 0;
 }

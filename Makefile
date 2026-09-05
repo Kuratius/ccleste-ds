@@ -31,7 +31,7 @@ SDIMAGE		:= image.bin
 # -----------------
 
 # List of folders to combine into the root of NitroFS:
-NITROFSDIR	:=
+NITROFSDIR	:= nitrofiles
 
 # Tools
 # -----
